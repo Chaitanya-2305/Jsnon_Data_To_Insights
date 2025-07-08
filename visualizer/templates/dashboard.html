@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualization Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container mt-4">
+    <h2 class="mb-4">Dashboard - Intensity by Topic</h2>
+
+    <!-- Filters -->
+    <div class="row mb-4">
+      <div class="col">
+        <label>Topic</label>
+        <select id="topicFilter" class="form-select">
+          <option value="">All Topics</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Region</label>
+        <select id="regionFilter" class="form-select">
+          <option value="">All Regions</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Sector</label>
+        <select id="sectorFilter" class="form-select">
+          <option value="">All Sectors</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <canvas id="intensityChart" height="100"></canvas>
+
+    <!-- Summary -->
+    <div id="analyticsSummary" class="mt-4">
+      <h5>Analytics Summary</h5>
+      <p id="totalInsights"></p>
+      <p id="avgIntensity"></p>
+    </div>
+  </div>
+
+  <!-- Script -->
+  <script>
+    let allData = [];
+
+    function updateChart(filteredData) {
+      const topicMap = {};
+      filteredData.forEach(item => {
+        const topic = item.topic || "Unknown";
+        topicMap[topic] = (topicMap[topic] || 0) + (item.intensity || 0);
+      });
+
+      const labels = Object.keys(topicMap);
+      const values = Object.values(topicMap);
+
+      const ctx = document.getElementById("intensityChart").getContext("2d");
+      if (window.chart) window.chart.destroy();
+      window.chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Total Intensity by Topic',
+            data: values,
+            backgroundColor: 'rgba(54, 162, 235, 0.6)'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: true } }
+        }
+      });
+
+      // Update Summary
+      document.getElementById("totalInsights").innerText = `Total Records: ${filteredData.length}`;
+      const avg = filteredData.reduce((sum, d) => sum + (d.intensity || 0), 0) / (filteredData.length || 1);
+      document.getElementById("avgIntensity").innerText = `Average Intensity: ${avg.toFixed(2)}`;
+    }
+
+    function applyFilters() {
+      const topic = document.getElementById("topicFilter").value;
+      const region = document.getElementById("regionFilter").value;
+      const sector = document.getElementById("sectorFilter").value;
+
+      const filtered = allData.filter(item =>
+        (!topic || item.topic === topic) &&
+        (!region || item.region === region) &&
+        (!sector || item.sector === sector)
+      );
+
+      updateChart(filtered);
+    }
+
+    function populateFilters(data) {
+      const topics = [...new Set(data.map(d => d.topic).filter(Boolean))];
+      const regions = [...new Set(data.map(d => d.region).filter(Boolean))];
+      const sectors = [...new Set(data.map(d => d.sector).filter(Boolean))];
+
+      const fillSelect = (id, items) => {
+        const select = document.getElementById(id);
+        items.sort().forEach(item => {
+          const opt = document.createElement("option");
+          opt.value = item;
+          opt.textContent = item;
+          select.appendChild(opt);
+        });
+      };
+
+      fillSelect("topicFilter", topics);
+      fillSelect("regionFilter", regions);
+      fillSelect("sectorFilter", sectors);
+    }
+
+    fetch("/api/insights/")
+      .then(res => res.json())
+      .then(data => {
+        allData = data;
+        populateFilters(data);
+        updateChart(data);
+      });
+
+    document.getElementById("topicFilter").addEventListener("change", applyFilters);
+    document.getElementById("regionFilter").addEventListener("change", applyFilters);
+    document.getElementById("sectorFilter").addEventListener("change", applyFilters);
+  </script>
+</body>
+</html>
